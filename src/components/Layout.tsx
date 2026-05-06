@@ -5,6 +5,7 @@ import { Sidebar } from './Sidebar';
 import { TerminalPanel } from './TerminalPanel';
 import { EditorPanel } from './EditorPanel';
 import { BlocksPanel } from './BlocksPanel';
+import { BottomInputArea } from './BottomInputArea';
 import { SettingsModal } from './SettingsModal';
 import { SessionTypeModal } from './SessionTypeModal';
 import { StatusBar } from './StatusBar';
@@ -133,22 +134,30 @@ export function Layout() {
             <span className="text-[11px] text-[var(--text-3)] ml-2">{shortSessionId}</span>
           </div>
 
-          {/* Content area */}
-          {activeView === 'terminal' ? (
-            <TerminalPanel sessionId={activeSessionId} />
-          ) : activeView === 'blocks' ? (
-            <BlocksPanel
-              sessionId={activeSessionId}
-              executeCommand={executeCommand}
-              isExecuting={isExecuting}
-              onAiSubmit={submitAiQuery}
-              isAiLoading={isAiLoading}
-              aiError={aiError}
-              onClearAiError={clearAiError}
-            />
-          ) : (
-            <EditorPanel sessionId={activeSessionId} />
-          )}
+          {/* Content area — 始终挂载三个面板，用 CSS 隐藏非活跃视图，保留 xterm.js 实例和 scrollback buffer */}
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <div className={activeView === 'terminal' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+              <TerminalPanel sessionId={activeSessionId} isVisible={activeView === 'terminal'} />
+            </div>
+            <div className={activeView === 'blocks' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+              <BlocksPanel sessionId={activeSessionId} />
+            </div>
+            <div className={activeView === 'editor' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+              <EditorPanel sessionId={activeSessionId} />
+            </div>
+          </div>
+
+          {/* Bottom fixed input bar: 终端命令 / Blocks 命令（Editor 模式隐藏） */}
+          <BottomInputArea
+            sessionId={activeSessionId}
+            activeView={activeView}
+            executeCommand={executeCommand}
+            isExecuting={isExecuting}
+            onAiSubmit={submitAiQuery}
+            isAiLoading={isAiLoading}
+            aiError={aiError}
+            onClearAiError={clearAiError}
+          />
 
           {/* Status Bar */}
           <StatusBar sessionId={activeSessionId} />

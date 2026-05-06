@@ -5,10 +5,23 @@ import {
   detectFileListEntries,
   detectOutputKind,
 } from '../../lib/outputDispatch';
+import {
+  parseDiskUsage,
+  parseProcessTable,
+  parseGitStatus,
+  parseDirectoryChart,
+} from '../../lib/outputDetector';
+import { parseLsAl } from '../../lib/fileParser';
 import { AnsiText } from './AnsiText';
 import { CodeBlock } from './CodeBlock';
 import { FileGrid } from './FileGrid';
+import { FileListTable } from './FileListTable';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { DiskUsageCard } from './DiskUsageCard';
+import { ProcessTable } from './ProcessTable';
+import { GitStatus } from './GitStatus';
+import { DirectoryChart } from './DirectoryChart';
+import { JsonViewer } from './JsonViewer';
 
 export interface OutputRendererProps {
   /** 原始包含控制字符的 stdout 字符串。 */
@@ -43,6 +56,7 @@ export function OutputRenderer({ rawOutput, command, mode = 'auto' }: OutputRend
     }
     const kind = detectOutputKind(command, plain);
     const lang = kind === 'code' ? detectCodeLang(command, plain) : 'text';
+    console.log('[OutputRenderer] 🏷 kind=', kind, '| cmd=', command.substring(0, 40), '| plain-preview:', plain.substring(0, 100));
     return { sanitized, plain, kind, lang };
   }, [rawOutput, command, mode]);
 
@@ -51,6 +65,46 @@ export function OutputRenderer({ rawOutput, command, mode = 'auto' }: OutputRend
   }
 
   switch (kind) {
+    case 'diskUsage': {
+      const diskEntries = parseDiskUsage(plain);
+      if (diskEntries.length === 0) {
+        return <AnsiText text={sanitized} />;
+      }
+      return <DiskUsageCard entries={diskEntries} />;
+    }
+    case 'processTable': {
+      const procEntries = parseProcessTable(plain);
+      if (procEntries.length === 0) {
+        return <AnsiText text={sanitized} />;
+      }
+      return <ProcessTable entries={procEntries} />;
+    }
+    case 'gitStatus': {
+      const gitData = parseGitStatus(plain);
+      if (!gitData) {
+        return <AnsiText text={sanitized} />;
+      }
+      return <GitStatus data={gitData} />;
+    }
+    case 'directoryChart': {
+      const dirEntries = parseDirectoryChart(plain);
+      if (dirEntries.length === 0) {
+        return <AnsiText text={sanitized} />;
+      }
+      return <DirectoryChart entries={dirEntries} />;
+    }
+    case 'json':
+      return <JsonViewer text={plain} />;
+    case 'fileListTable': {
+      console.log('[OutputRenderer] 🎨 entering fileListTable branch, plain-len=', plain.length);
+      const lsEntries = parseLsAl(plain);
+      console.log('[OutputRenderer] 🎨 FileListTable entries count:', lsEntries.length);
+      if (lsEntries.length === 0) {
+        console.log('[OutputRenderer] ⚠️ parseLsAl returned empty → fallback to AnsiText');
+        return <AnsiText text={sanitized} />;
+      }
+      return <FileListTable entries={lsEntries} />;
+    }
     case 'fileList': {
       const entries = detectFileListEntries(sanitized);
       if (entries.length === 0) {

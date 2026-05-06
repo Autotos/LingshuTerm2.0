@@ -5,8 +5,19 @@
  */
 
 import { parseAnsiToSegments, stripAllAnsi } from './ansi';
+import { detectLsAl } from './fileParser';
 
-export type OutputKind = 'fileList' | 'code' | 'markdown' | 'plain';
+export type OutputKind =
+  | 'fileListTable'
+  | 'fileList'
+  | 'diskUsage'
+  | 'processTable'
+  | 'gitStatus'
+  | 'directoryChart'
+  | 'json'
+  | 'code'
+  | 'markdown'
+  | 'plain';
 
 export interface FileEntry {
   name: string;
@@ -38,41 +49,130 @@ const EXT_LANG: Record<string, string> = {
 /**
  * 根据命令 + 去 ANSI 后的纯文本判断输出类型。
  *
- * 短路规则：
- *   1. ls/dir/tree 且看起来是多列短词 → fileList
- *   2. 纯文本首字符 `{` 或 `[` → code（JSON）
- *   3. 命令形如 `cat foo.json` → code（按扩展名）
- *   4. 含 Markdown 语法（#, fenced, table） → markdown
- *   5. 其它 → plain
+ * 短路规则（按优先级）：
+ *   1. 检测到 JSON 开头 { / [ 且可 parse → json
+ *   2. df -h 表头特征 → diskUsage
+ *   3. ps aux 表头特征 → processTable
+ *   4. git status 特征词 → gitStatus
+ *   5. du -sh 行格式 → directoryChart
+ *   6. ls -al 长格式 → fileListTable
+ *   7. ls/dir/tree 且看起来是多列短词 → fileList
+ *   8. 纯文本首字符 `{` 或 `[` → code（JSON 不可 parse 时）
+ *   9. 命令形如 `cat foo.json` → code（按扩展名）
+ *   10. 含 Markdown 语法（#, fenced, table） → markdown
+ *   11. 其它 → plain
  */
 export function detectOutputKind(command: string, cleanText: string): OutputKind {
+  // 已在本模块内使用 detectDiskUsage 等，但这里保持函数独立
   const cmd = command.trim();
   const text = cleanText;
   const trimmed = text.trimStart();
 
+  // 1. JSON
+  if (detectJsonIntra(text)) {
+    return 'json';
+  }
+
+  // 2. df -h
+  if (detectDiskUsageIntra(text)) {
+    return 'diskUsage';
+  }
+
+  // 3. ps aux
+  if (detectProcessTableIntra(text)) {
+    return 'processTable';
+  }
+
+  // 4. git status
+  if (detectGitStatusIntra(text)) {
+    return 'gitStatus';
+  }
+
+  // 5. du -sh
+  if (detectDirectoryChartIntra(text)) {
+    return 'directoryChart';
+  }
+
+  // 6. ls -al 长格式（必须在短 ls 前面检测，避免权限位被 looksLikeFileList 误判）
+  if (detectLsAl(text)) {
+    return 'fileListTable';
+  }
+
+  // 7. ls 短格式
   if (FILE_LIST_CMD_RE.test(cmd) && looksLikeFileList(text)) {
     return 'fileList';
   }
 
-  // JSON 兜头
+  // 8. JSON 兜头但不可 parse → code
   const firstChar = trimmed.charAt(0);
   if (firstChar === '{' || firstChar === '[') {
-    // 粗检末字符，避免把普通中括号开头的日志行误判
     const lastChar = trimmed.trimEnd().slice(-1);
     if (lastChar === '}' || lastChar === ']') {
       return 'code';
     }
   }
 
+  // 9. cat foo.ext
   if (CODE_FILE_CMD_RE.test(cmd)) {
     return 'code';
   }
 
+  // 10. Markdown
   if (looksLikeMarkdown(text)) {
     return 'markdown';
   }
 
   return 'plain';
+}
+
+// 内联检测函数（避免循环依赖）
+const DF_HEADER_RE = /\b(Filesystem|文件系统)\b.*\b(Size|容量|大小)\b.*\b(Used|已用)\b.*\b(Avail|可用)\b.*\b(Use%|使用率)\b.*\b(Mounted|挂载点)\b/i;
+const PS_HEADER_RE = /^\s*USER\s+(?:PID\s+)?%CPU\s+%MEM\b/m;
+const GIT_BRANCH_RE = /^\s*(?:On branch|位于分支)\s+\S+/m;
+const GIT_CHANGES_RE = /Changes (?:to be committed|not staged for commit):/i;
+const GIT_UNTRACKED_RE = /Untracked files:/i;
+const DU_LINE_RE = /^\s*(\d+(?:\.\d+)?)\s*([KMGT]?)\t?\s+\S.*$/;
+
+function detectDiskUsageIntra(text: string): boolean {
+  return DF_HEADER_RE.test(text);
+}
+
+function detectProcessTableIntra(text: string): boolean {
+  return PS_HEADER_RE.test(text);
+}
+
+function detectGitStatusIntra(text: string): boolean {
+  return (
+    GIT_BRANCH_RE.test(text) ||
+    GIT_CHANGES_RE.test(text) ||
+    GIT_UNTRACKED_RE.test(text)
+  );
+}
+
+function detectDirectoryChartIntra(text: string): boolean {
+  if (DF_HEADER_RE.test(text)) return false;
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return false;
+  let matched = 0;
+  for (const line of lines) {
+    if (DU_LINE_RE.test(line.trim())) matched++;
+  }
+  return matched >= Math.max(1, lines.length * 0.6);
+}
+
+function detectJsonIntra(text: string): boolean {
+  const trimmed = text.trimStart();
+  const first = trimmed.charAt(0);
+  if (first !== '{' && first !== '[') return false;
+  const lastNonBlank = trimmed.trimEnd().slice(-1);
+  if (first === '{' && lastNonBlank !== '}') return false;
+  if (first === '[' && lastNonBlank !== ']') return false;
+  try {
+    JSON.parse(trimmed);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function looksLikeFileList(text: string): boolean {

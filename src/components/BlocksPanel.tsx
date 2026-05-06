@@ -1,22 +1,19 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { TerminalSquare } from 'lucide-react';
-import { useSessionBlocks } from '@/stores/commandStore';
+import { useSessionBlocks, useCommandStore } from '@/stores/commandStore';
 import { CommandBlock } from './CommandBlock';
-import { CommandInput } from './CommandInput';
+import { ContextMenu } from './ContextMenu';
+import type { ContextMenuItem } from './ContextMenu';
 
 interface BlocksPanelProps {
   sessionId: string | null;
-  executeCommand: (command: string) => Promise<string | null>;
-  isExecuting: boolean;
-  onAiSubmit?: (query: string) => Promise<void>;
-  isAiLoading?: boolean;
-  aiError?: string | null;
-  onClearAiError?: () => void;
 }
 
-export function BlocksPanel({ sessionId, executeCommand, isExecuting, onAiSubmit, isAiLoading, aiError, onClearAiError }: BlocksPanelProps) {
+export function BlocksPanel({ sessionId }: BlocksPanelProps) {
   const blocks = useSessionBlocks(sessionId);
+  const clearSessionBlocks = useCommandStore((s) => s.clearSessionBlocks);
   const listRef = useRef<HTMLDivElement>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
 
   // Auto-scroll to bottom when new blocks appear or running block gets output
   useEffect(() => {
@@ -29,8 +26,34 @@ export function BlocksPanel({ sessionId, executeCommand, isExecuting, onAiSubmit
     }
   }, [blocks]);
 
+  // --- 右键菜单 ---
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setMenu({ x: e.clientX, y: e.clientY });
+    },
+    [],
+  );
+
+  const handleClearBlocks = useCallback(() => {
+    if (sessionId) {
+      clearSessionBlocks(sessionId);
+    }
+  }, [sessionId, clearSessionBlocks]);
+
+  const menuItems: ContextMenuItem[] = [
+    {
+      label: 'Clear Blocks',
+      onClick: handleClearBlocks,
+      disabled: !sessionId || blocks.length === 0,
+    },
+  ];
+
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+    <div
+      className="flex-1 flex flex-col min-h-0 overflow-hidden"
+      onContextMenu={handleContextMenu}
+    >
       {/* Block list */}
       <div
         ref={listRef}
@@ -47,16 +70,14 @@ export function BlocksPanel({ sessionId, executeCommand, isExecuting, onAiSubmit
         )}
       </div>
 
-      {/* Command input */}
-      <CommandInput
-        sessionId={sessionId}
-        onExecute={executeCommand}
-        onAiSubmit={onAiSubmit}
-        isExecuting={isExecuting}
-        isAiLoading={isAiLoading}
-        aiError={aiError}
-        onClearAiError={onClearAiError}
-      />
+      {menu && (
+        <ContextMenu
+          items={menuItems}
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+        />
+      )}
     </div>
   );
 }

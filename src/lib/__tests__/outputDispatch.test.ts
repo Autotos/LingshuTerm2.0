@@ -18,9 +18,9 @@ describe('detectOutputKind', () => {
     expect(detectOutputKind('ls', 'README.md')).toBe('plain');
   });
 
-  it('recognizes JSON content as code', () => {
-    expect(detectOutputKind('some', '{"a":1,"b":2}')).toBe('code');
-    expect(detectOutputKind('other', '[\n  1,\n  2\n]')).toBe('code');
+  it('recognizes valid JSON content as json', () => {
+    expect(detectOutputKind('some', '{"a":1,"b":2}')).toBe('json');
+    expect(detectOutputKind('other', '[\n  1,\n  2\n]')).toBe('json');
   });
 
   it('recognizes `cat file.json` as code via extension', () => {

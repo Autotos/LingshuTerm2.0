@@ -210,7 +210,7 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
     };
   }, [sessionId]);
 
-  // Setup terminal data events (user input → PTY)
+  // Setup terminal data events (user input → PTY) + resize
   useEffect(() => {
     if (!terminalRef.current || !sessionId) return;
 
@@ -244,6 +244,34 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
     };
   }, [sessionId]);
 
+  // ResizeObserver — 容器尺寸变化时自动 fit
+  // 处理：窗口缩放、Sidebar 展开/收起、视图切换（hidden→visible）等
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !fitAddonRef.current) return;
+
+    let rafPending = false;
+    const observer = new ResizeObserver(() => {
+      // 用 rAF 合并同一帧内的多次回调
+      if (rafPending) return;
+      rafPending = true;
+      requestAnimationFrame(() => {
+        rafPending = false;
+        try {
+          fitAddonRef.current?.fit();
+        } catch {
+          /* ignore */
+        }
+      });
+    });
+
+    observer.observe(el);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [containerRef]);
+
   const createSession = useCallback(async (shell?: string, cwd?: string) => {
     // Routes through the unified `create_session(config)` entry point.
     const newSessionId: string = await invoke('create_session', {
@@ -260,9 +288,19 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
     fitAddonRef.current?.fit();
   }, []);
 
+  const clear = useCallback(() => {
+    terminalRef.current?.clear();
+  }, []);
+
+  const getSelection = useCallback(() => {
+    return terminalRef.current?.getSelection() ?? '';
+  }, []);
+
   return {
     terminal: terminalRef.current,
     createSession,
     fit,
+    clear,
+    getSelection,
   };
 }

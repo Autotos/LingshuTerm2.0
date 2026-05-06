@@ -69,10 +69,12 @@ body {
 /* xterm customization */
 .xterm {
   padding: 8px;
+  height: 100% !important; /* 强制占满父容器，覆盖 xterm.js 内联样式 */
 }
 
 .xterm .xterm-viewport {
   overflow-y: auto;
+  height: 100% !important;
 }
 
 /* Scrollbar — Warp minimal */
