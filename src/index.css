@@ -1,0 +1,276 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════
+   Warp-inspired design tokens
+   暖灰近黑 · 极度克制 · 边框而非阴影
+   ═══════════════════════════════════════════ */
+:root {
+  /* Surface */
+  --void:       #0e0e0d;
+  --deep:       #161615;
+  --surface:    #1c1c1b;
+  --raised:     #232322;
+  --elevated:   #2a2a29;
+
+  /* Text — warm parchment scale */
+  --text-1:     #faf9f6;
+  --text-2:     #afaeac;
+  --text-3:     #868584;
+  --text-4:     #666469;
+
+  /* Borders — semi-transparent */
+  --border:     rgba(226, 226, 226, 0.1);
+  --border-hi:  rgba(226, 226, 226, 0.2);
+  --veil:       rgba(255, 255, 255, 0.04);
+
+  /* Accent — single warm tone */
+  --accent:     #7c6f64;
+  --accent-hi:  #a0917e;
+
+  /* Semantic */
+  --green:      #8fba7a;
+  --red:        #d4867c;
+  --yellow:     #c9b87a;
+  --blue:       #7ea8c7;
+  --magenta:    #b08dba;
+
+  /* Monospace stack */
+  --mono: 'Berkeley Mono', 'JetBrains Mono', 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+}
+
+/* Base reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--mono);
+  background: var(--void);
+  color: var(--text-1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Terminal container */
+.terminal-container {
+  font-family: var(--mono);
+}
+
+/* xterm customization */
+.xterm {
+  padding: 8px;
+}
+
+.xterm .xterm-viewport {
+  overflow-y: auto;
+}
+
+/* Scrollbar — Warp minimal */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-hi);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-4);
+}
+
+/* Prevent text selection on title bar */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Block fade-in animation (Warp signature) */
+@keyframes block-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-block-in {
+  animation: block-in 150ms ease-out;
+}
+
+/* Kbd style — Warp keyboard hint */
+kbd {
+  display: inline-block;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-3);
+  line-height: 16px;
+  background: transparent;
+}
+
+/* ═══════════════════════════════════════════
+   CommandBlock animations & prose
+   ═══════════════════════════════════════════ */
+
+/* Pulse border animation for running blocks */
+@keyframes pulse-border {
+  0%, 100% { border-left-color: var(--yellow); }
+  50% { border-left-color: transparent; }
+}
+
+.animate-pulse-border {
+  animation: pulse-border 1.5s ease-in-out infinite;
+}
+
+/* Markdown prose styling inside CommandBlock rich mode */
+.prose-block {
+  line-height: 1.6;
+}
+
+.prose-block p {
+  margin: 0.25em 0;
+}
+
+.prose-block code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--raised);
+  border-radius: 2px;
+  padding: 1px 4px;
+}
+
+.prose-block pre {
+  background: var(--raised);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 0.5em 0;
+  overflow-x: auto;
+}
+
+.prose-block pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.prose-block table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5em 0;
+  font-size: 12px;
+}
+
+.prose-block th,
+.prose-block td {
+  border: 1px solid var(--border-hi);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.prose-block th {
+  background: var(--raised);
+  font-weight: 600;
+}
+
+.prose-block h1, .prose-block h2, .prose-block h3 {
+  color: var(--text-1);
+  margin: 0.5em 0 0.25em;
+}
+
+.prose-block ul, .prose-block ol {
+  padding-left: 1.5em;
+  margin: 0.25em 0;
+}
+
+.prose-block a {
+  color: var(--blue);
+  text-decoration: underline;
+}
+
+.prose-block blockquote {
+  border-left: 2px solid var(--accent);
+  padding-left: 0.75em;
+  color: var(--text-3);
+  margin: 0.5em 0;
+}
+
+/* ═══════════════════════════════════════════
+   Settings Modal & TaskBoard styles
+   ═══════════════════════════════════════════ */
+
+/* Settings input fields */
+.settings-input {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-1);
+  font-family: var(--mono);
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.settings-input:focus {
+  border-color: var(--border-hi);
+}
+
+.settings-input::placeholder {
+  color: var(--text-4);
+}
+
+/* Settings select */
+.settings-input option {
+  background: var(--deep);
+  color: var(--text-1);
+}
+
+/* Task action buttons */
+.task-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  color: var(--text-3);
+  transition: all 0.15s;
+}
+
+.task-action-btn:hover {
+  color: var(--text-1);
+  background: var(--veil);
+}
+
+/* AI thinking shimmer animation */
+@keyframes ai-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-ai-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface) 25%,
+    var(--elevated) 50%,
+    var(--surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: ai-shimmer 1.5s ease-in-out infinite;
+}
