@@ -61,11 +61,10 @@ pub fn wrap_command(shell_type: ShellType, command_id: &str, user_command: &str)
         }
         ShellType::Bash | ShellType::Zsh | ShellType::Sh | ShellType::Unknown => {
             // POSIX shells: printf is the most portable way to emit arbitrary bytes.
+            // Wrapped in a subshell (…) so `unset PROMPT_COMMAND` does not leak
+            // into the parent shell and trigger unwanted prompt-hook output.
             format!(
-                "printf '\\033]7701;S;{id}\\007'\n\
-                 {cmd}\n\
-                 __ls_rc=$?\n\
-                 printf '\\033]7701;E;{id};%d\\007' \"$__ls_rc\"\n",
+                "(\n  unset PROMPT_COMMAND 2>/dev/null\n  printf '\\033]7701;S;{id}\\007'\n{cmd}\n__ls_rc=$?\n  printf '\\033]7701;E;{id};%d\\007' \"$__ls_rc\"\n)\n",
                 id = command_id,
                 cmd = user_command,
             )
