@@ -23,8 +23,6 @@ import { usePersistenceBootstrap } from '@/hooks/usePersistenceBootstrap';
 export function Layout() {
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const sessions = useSessionStore((s) => s.sessions);
-  const addSession = useSessionStore((s) => s.addSession);
-  const restoreTerminals = useSessionStore((s) => s.restoreTerminals);
   const { isEditorVisible, toggleEditor } = useUiStore();
   const [logsOpen, setLogsOpen] = useState(false);
   const [serversOpen, setServersOpen] = useState(false);
@@ -51,19 +49,6 @@ export function Layout() {
     if (bootstrappedRef.current) return;
     bootstrappedRef.current = true;
 
-    const currentSessions = useSessionStore.getState().sessions;
-    const currentActiveId = useSessionStore.getState().activeSessionId;
-
-    if (currentSessions.size === 0) {
-      // No restored sessions — create a Default session
-      addSession('Default');
-    } else if (currentActiveId) {
-      // Restored sessions exist — auto-reconnect terminals for the active session
-      const activeSession = currentSessions.get(currentActiveId);
-      if (activeSession && activeSession.terminals.length > 0) {
-        restoreTerminals(currentActiveId);
-      }
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persistence.ready]);
 

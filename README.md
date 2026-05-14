@@ -96,9 +96,7 @@ npm run tauri:build
 ```
 
 构建产物位于 `src-tauri/target/release/bundle/`：
-- **`nsis/`** — Windows 安装包 (`.exe`)
 - **`msi/`** — Windows MSI 安装包
-- **`portable/`** — 免安装便携版
 
 ## 项目结构
 

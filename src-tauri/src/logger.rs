@@ -6,7 +6,9 @@
 //! Rotation: when a log file exceeds `max_size_mb`, it is renamed to
 //!   {Terminal Name}_{YYYYMMDD_HHmmss}.log and a new empty file is created.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 use regex::Regex;
 use serde::Serialize;
@@ -15,6 +17,38 @@ use tokio::fs::{self, OpenOptions};
 use tokio::io::AsyncWriteExt;
 
 use crate::utils::workspace_dir;
+
+/// Per-file buffer of partial lines that haven't ended with \n yet.
+static LINE_BUFFERS: std::sync::LazyLock<Mutex<HashMap<String, String>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Generate a display timestamp: `[YYYY-MM-DD HH:mm:ss]`
+fn log_timestamp() -> String {
+    use std::time::SystemTime;
+    let dur = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = dur.as_secs();
+    let days = secs / 86400;
+    let mut y = 1970i64;
+    let mut remaining = days as i64;
+    loop {
+        let diy = if (y % 4 == 0 && y % 100 != 0) || y % 400 == 0 { 366 } else { 365 };
+        if remaining < diy { break; }
+        remaining -= diy;
+        y += 1;
+    }
+    let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+    let md = [31, if leap { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let mut m = 1i64;
+    for &d in &md { if remaining < d { break; } remaining -= d; m += 1; }
+    let d = remaining + 1;
+    let ts = secs % 86400;
+    let h = ts / 3600;
+    let min = (ts % 3600) / 60;
+    let s = ts % 60;
+    format!("[{:04}-{:02}-{:02} {:02}:{:02}:{:02}]", y, m, d, h, min, s)
+}
 
 /// Strip ANSI escape sequences (SGR colors, OSC codes, CSI sequences) from log data.
 fn strip_ansi(data: &str) -> String {
@@ -123,12 +157,32 @@ pub async fn write_log(
         .await
         .map_err(|e| format!("open log file: {}", e))?;
 
-    if trimmed.is_empty() {
-        file.write_all(b"\n")
-            .await
-            .map_err(|e| format!("write newline: {}", e))?;
-    } else {
-        file.write_all(trimmed.as_bytes())
+    // Buffer partial lines: only write complete lines with a single timestamp.
+    // Individual keystroke echoes (e.g. 'l', 's') are buffered until Enter (\n) arrives.
+    let output = {
+        let mut buffers = LINE_BUFFERS.lock().unwrap();
+        let buf = buffers.entry(file_path.to_string_lossy().to_string()).or_default();
+        buf.push_str(&trimmed);
+
+        if trimmed.is_empty() || !buf.contains('\n') {
+            return Ok(());
+        }
+
+        let mut out = String::new();
+        while let Some(pos) = buf.find('\n') {
+            let line = buf[..=pos].trim_end_matches(['\r', '\n']).to_string();
+            buf.drain(..=pos);
+            if !line.is_empty() {
+                out.push_str(&format!("{} {}\n", log_timestamp(), line));
+            } else {
+                out.push('\n');
+            }
+        }
+        out
+    }; // MutexGuard dropped here, before .await
+
+    if !output.is_empty() {
+        file.write_all(output.as_bytes())
             .await
             .map_err(|e| format!("write log: {}", e))?;
     }

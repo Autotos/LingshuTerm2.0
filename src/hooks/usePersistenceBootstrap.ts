@@ -8,7 +8,6 @@ import { useEffect, useRef, useState } from 'react';
 
 import {
   flushAll,
-  restoreAllSessions,
   startPersistenceSubscriptions,
   stopPersistenceSubscriptions,
 } from '@/lib/persistenceSubscribe';
@@ -37,14 +36,14 @@ export function usePersistenceBootstrap(): BootstrapState {
 
     (async () => {
       try {
-        const { restoredCount, activeId } = await restoreAllSessions();
-        if (cancelled) return;
+        // Start with a blank slate — no sessions auto-restored from disk.
+        // Saved data in session.json is still available via Session Manager.
         startPersistenceSubscriptions();
-        setState({ ready: true, restoredCount, activeId, error: null });
+        if (cancelled) return;
+        setState({ ready: true, restoredCount: 0, activeId: null, error: null });
       } catch (e) {
         console.error('[persistence] bootstrap failed:', e);
         if (cancelled) return;
-        // 即使恢复失败也启用订阅，保证新数据能被写盘
         startPersistenceSubscriptions();
         setState({
           ready: true,
